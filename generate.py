@@ -33,8 +33,8 @@ links = []
 mac_counter = 1
 
 
-
-class leaf:
+@dataclass
+class node:
     name: str
     interfaces: List[str]
     nic_model: str = "virtio"
@@ -52,33 +52,90 @@ class leaf:
     storage_pci: Dict = field(default_factory=dict)
     used_ifaces: Set[str] = field(default_factory=set)
 
-for i in leafs:
+def allocate_iface(self) -> Optional[str]:
+    for iface in self.interfaces:
+        if iface not in self.used_ifaces:
+            self.used_ifaces.add(iface)
+            return iface
+    return None
 
-    d = {
+def mark_iface(self, iface: str) -> None:
+    self.used_ifaces.add(iface)
 
-        "nic_model": "virtio",
-        "cpu": 1,
-        "memory": 2048,
-        "storage": 10,
-        "positioning": {
-            "x": 10*(1+leafs.index(i)),
-            "y": 40
-        },
+
+def to_dict(self) -> dict:
+    return {
+        "nic_model": self.nic_model,
+        "cpu": self.cpu,
+        "memory": self.memory,
+        "storage": self.storage,
+        "positioning": self.positioning,
         "os": "cumulus-vx-5.9.4",
-        "features": {
-            "uefi": False,
-            "tpm": False
-        },
-        "pxehost": False,
-        "secureboot": False,
-        "oob": False,
-        "emulation_type": None,
-        "network_pci": {},
-        "cpu_options": [],
-        "storage_pci": {}
+        "features": self.features,
+        "pxehost": self.pxehost,
+        "secureboot": self.secureboot,
+        "oob": self.oob,
+        "emulation_type": self.emulation_type,
+        "network_pci": self.network_pci,
+        "cpu_options": self.cpu_options,
+        "storage_pci": self.storage_pci
     }
 
-    nodes[i] = d
+interfaces = [f"swp{x}" for x in range(1, 17)]
+
+
+for leaf in leafs:
+
+    leaf_obj = node(leaf, interfaces, positioning={"x": int(leafs.index(leaf)*10), "y": 20})
+
+for spine in spines:
+
+    spine_obj = node(spine, interfaces, positioning={"x": int(leafs.index(leaf)*10), "y": 50})
+
+## Allocate interface on Leaf
+iface = leaf.allocate_iface()
+
+## Check if allocated OK
+if iface:
+
+    ## Allocate same interface on Spine
+    spine.mark_iface(iface)
+
+    ## Build Link Entry for Nvidia
+    link = [
+
+        {"interface": iface, "node": leaf.name, "mac": "aa:bb:cc:00:00:01", "network_pci": None},
+        {"interface": iface, "node": spine.name, "mac": "aa:bb:cc:00:00:01", "network_pci": None},
+
+    ]
+
+#for i in leafs:
+#
+#    d = {
+#
+#        "nic_model": "virtio",
+#        "cpu": 1,
+#        "memory": 2048,
+#        "storage": 10,
+#        "positioning": {
+#            "x": 10*(1+leafs.index(i)),
+#            "y": 40
+#        },
+#        "os": "cumulus-vx-5.9.4",
+#        "features": {
+#            "uefi": False,
+#            "tpm": False
+#        },
+#        "pxehost": False,
+#        "secureboot": False,
+#        "oob": False,
+#        "emulation_type": None,
+#        "network_pci": {},
+#        "cpu_options": [],
+#        "storage_pci": {}
+#    }
+#
+#    nodes[i] = d
 
 file_structure["content"]["nodes"] = nodes
 
