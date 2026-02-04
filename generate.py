@@ -2,6 +2,9 @@
 import json
 from dataclasses import dataclass, field
 from typing import List, Set, Optional, Dict
+from netaddr import *
+import random
+mac = ':'.join(['{:02x}'.format(0) for _ in range(6)])
 
 file_structure = {
 
@@ -26,12 +29,29 @@ spines = ["spine3","spine4"]
 
 interfaces = 16
 
-interface_list = [f"swp{x}" for x in range(1,interfaces +1) ]
 iface_index = 0
 used_endpoints = set()
 links = []
 mac_counter = 1
+interfaces = [f"swp{x}" for x in range(1, 17)]
 
+@dataclass
+class link:
+    interface_a: str
+    node_a: str
+    mac_a: str
+    network_pci_a: None
+    interface_b: str
+    node_b: str
+    mac_b: str
+    network_pci_b: None
+    interface_role_b: None
+    scalable_unit: None
+
+    def mac_generate(self, prefix) -> str:
+
+        mac = ':'.join(['{:02x}'.format(random.randint(0, 255)) for _ in range(6)])
+        return mac
 
 @dataclass
 class node:
@@ -51,91 +71,81 @@ class node:
     cpu_options: List = field(default_factory=list)
     storage_pci: Dict = field(default_factory=dict)
     used_ifaces: Set[str] = field(default_factory=set)
+    config_ifaces: List = field(default_factory=list)
 
-def allocate_iface(self) -> Optional[str]:
-    for iface in self.interfaces:
-        if iface not in self.used_ifaces:
-            self.used_ifaces.add(iface)
-            return iface
-    return None
+    def allocate_iface(self) -> Optional[str]:
+        for iface in self.interfaces:
+            if iface not in self.used_ifaces:
+                self.used_ifaces.add(iface)
+                return iface
+        return None
 
-def mark_iface(self, iface: str) -> None:
-    self.used_ifaces.add(iface)
+    def mark_iface(self, iface: str) -> None:
+        self.used_ifaces.add(iface)
 
 
-def to_dict(self) -> dict:
-    return {
-        "nic_model": self.nic_model,
-        "cpu": self.cpu,
-        "memory": self.memory,
-        "storage": self.storage,
-        "positioning": self.positioning,
-        "os": "cumulus-vx-5.9.4",
-        "features": self.features,
-        "pxehost": self.pxehost,
-        "secureboot": self.secureboot,
-        "oob": self.oob,
-        "emulation_type": self.emulation_type,
-        "network_pci": self.network_pci,
-        "cpu_options": self.cpu_options,
-        "storage_pci": self.storage_pci
-    }
+    def to_dict(self) -> dict:
+        return {
+            "nic_model": self.nic_model,
+            "cpu": self.cpu,
+            "memory": self.memory,
+            "storage": self.storage,
+            "positioning": self.positioning,
+            "os": "cumulus-vx-5.9.4",
+            "features": self.features,
+            "pxehost": self.pxehost,
+            "secureboot": self.secureboot,
+            "oob": self.oob,
+            "emulation_type": self.emulation_type,
+            "network_pci": self.network_pci,
+            "cpu_options": self.cpu_options,
+            "storage_pci": self.storage_pci,
+            "used_ifaces": self.used_ifaces,
+            "config_ifaces": self.config_ifaces
 
-interfaces = [f"swp{x}" for x in range(1, 17)]
+        }
+
+
+
 
 
 for leaf in leafs:
 
+    mac_prefix = "aa:"
+
     leaf_obj = node(leaf, interfaces, positioning={"x": int(leafs.index(leaf)*10), "y": 20})
+
+    ## Allocate interface on Leaf
+
+    iface = leaf_obj.allocate_iface()
+
+    leaf_obj.mark_iface(iface)
+
+    #leaf_obj.config_ifaces.append({"interface": iface, "node": leaf_obj.name, "mac": "aa:bb:cc:00:00:01", "network_pci": None},)
+
+
 
 for spine in spines:
 
-    spine_obj = node(spine, interfaces, positioning={"x": int(leafs.index(leaf)*10), "y": 50})
+    mac_prefix = "bb:"
 
-## Allocate interface on Leaf
-iface = leaf.allocate_iface()
+    spine_obj = node(spine, interfaces, positioning={"x": int(spines.index(spine)*10), "y": 50})
 
-## Check if allocated OK
-if iface:
+    iface = spine_obj.allocate_iface()
 
     ## Allocate same interface on Spine
-    spine.mark_iface(iface)
+    spine_obj.mark_iface(iface)
 
     ## Build Link Entry for Nvidia
-    link = [
+    #{"interface": iface, "node": spine_obj.name, "mac": f"{mac_prefix}}", "network_pci": None},
 
-        {"interface": iface, "node": leaf.name, "mac": "aa:bb:cc:00:00:01", "network_pci": None},
-        {"interface": iface, "node": spine.name, "mac": "aa:bb:cc:00:00:01", "network_pci": None},
 
-    ]
 
-#for i in leafs:
-#
-#    d = {
-#
-#        "nic_model": "virtio",
-#        "cpu": 1,
-#        "memory": 2048,
-#        "storage": 10,
-#        "positioning": {
-#            "x": 10*(1+leafs.index(i)),
-#            "y": 40
-#        },
-#        "os": "cumulus-vx-5.9.4",
-#        "features": {
-#            "uefi": False,
-#            "tpm": False
-#        },
-#        "pxehost": False,
-#        "secureboot": False,
-#        "oob": False,
-#        "emulation_type": None,
-#        "network_pci": {},
-#        "cpu_options": [],
-#        "storage_pci": {}
-#    }
-#
-#    nodes[i] = d
+#spine_leaf_pairs = 
+
+print({(spine, leaf) for spine in spines for leaf in leafs})
+
+
 
 file_structure["content"]["nodes"] = nodes
 
